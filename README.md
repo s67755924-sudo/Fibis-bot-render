@@ -1,0 +1,2 @@
+# Fibis-bot-render
+bot
