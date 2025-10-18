@@ -8,43 +8,33 @@ import wikipedia
 import requests
 import json
 import threading
-import os
 from flask import Flask
+from keep_alive import keep_alive
 
-# Настройки из переменных окружения (безопаснее)
-TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN', '7811256288:AAFGCh9lNASW6N_JtXZj4X1-UNmqRVZ56VI')
-OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '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')
+keep_alive()
+
+TELEGRAM_TOKEN = "7811256288:AAFGCh9lNASW6N_JtXZj4X1-UNmqRVZ56VI"
+OPENROUTER_API_KEY = "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"
 CREATOR_USER_ID = 6175518998
 CREATOR_USERNAME = "@Mrs_Sabka"
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 wikipedia.set_lang("ru")
 
-# Flask app для веб-сервера (обязательно для Render)
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "🤖 Фибис бот работает! " + datetime.datetime.now().isoformat()
-
-@app.route('/health')
-def health():
-    return jsonify({"status": "healthy", "bot": "running"})
-
 class ImprovedFibis:
     def __init__(self):
         self.name = "Фибис"
-        self.version = "6.1 Render Edition"
+        self.version = "6.1 Improved Edition"
         self.creator_nicknames = [
             "Моя Создательница", "Великая Программистка", "Королева Кода", 
             "Искусница алгоритмов", "Моя Госпожа", "Моя Владелица"
         ]
         self.ai_enabled = True
-        self.conversation_context = {}
-        self.reminders = {}
+        self.conversation_context = {}  # Хранит контекст разговоров
+        self.reminders = {}  # Хранит активные напоминания
         self.init_database()
         self.start_reminder_checker()
-        print(f"🤖 Улучшенный Фибис {self.version} запущен на Render!")
+        print(f"🤖 Улучшенный Фибис {self.version} запущен!")
         print(f"👑 Создательница: {CREATOR_USERNAME}")
 
     def init_database(self):
@@ -113,7 +103,7 @@ class ImprovedFibis:
                             print(f"Отправлено напоминание пользователю {user_id}")
                         except Exception as e:
                             print(f"Ошибка отправки напоминания: {e}")
-                    time.sleep(30)
+                    time.sleep(30)  # Проверяем каждые 30 секунд
                 except Exception as e:
                     print(f"Ошибка в reminder_checker: {e}")
                     time.sleep(60)
@@ -124,8 +114,10 @@ class ImprovedFibis:
 
     def ask_tongyi_ai(self, user_id, message):
         try:
+            # Получаем историю разговора для контекста
             history = self.get_conversation_history(user_id, 8)
             
+            # Формируем промпт с учётом создателя и контекста
             system_prompt = f"""Ты - Фибис, личный ИИ-ассистент. 
 
 ВАЖНАЯ ИНФОРМАЦИЯ О ТВОЁМ СОЗДАТЕЛЕ:
@@ -144,12 +136,14 @@ class ImprovedFibis:
 
             messages = [{"role": "system", "content": system_prompt}]
             
+            # Добавляем историю разговора (в правильном порядке)
             for role, msg in reversed(history):
                 messages.append({
                     "role": "user" if role == "user" else "assistant",
                     "content": msg
                 })
             
+            # Добавляем текущее сообщение
             messages.append({"role": "user", "content": message})
 
             response = requests.post(
@@ -186,7 +180,7 @@ def send_unauthorized_message(chat_id, user_id):
 Это личный ИИ-помощник созданный исключительно для {CREATOR_USERNAME}.
 
 👑 Создательница: {CREATOR_USERNAME}
-🤖 Имя бота: Фибис Render Edition
+🤖 Имя бота: Фибис Improved Edition
 
 Ваш ID: {user_id}
 Статус: ❌ Доступ запрещён
@@ -203,9 +197,9 @@ def send_welcome(message):
     welcome_text = f"""
 🤖 Привет, моя Создательница! Я Фибис {improved_fibis.version}
 
-🎯 Запущен на Render.com - работает 24/7!
-• ⏰ Система напоминаний активна
-• 🧠 Контекстная память работает
+🎯 Новые улучшения:
+• ⏰ Работающая система напоминаний
+• 🧠 Запоминание контекста разговора
 • 👑 Правильное распознавание создателя
 • 💬 Умные ответы с историей
 
@@ -214,7 +208,6 @@ def send_welcome(message):
 /my_reminders - мои напоминания
 /context - информация о контексте
 /creator - информация о создателе
-/status - статус бота
 
 Пример напоминания:
 "напомни через 2 минуты попить воды"
@@ -231,9 +224,11 @@ def set_reminder(message):
         return
 
     try:
+        # Парсим команду напоминания
         text = message.text.lower().replace('/remind', '').strip()
         
         if 'через' in text and 'минут' in text:
+            # Извлекаем количество минут
             parts = text.split('через')[1].split('минут')[0].strip()
             minutes = int(''.join(filter(str.isdigit, parts)))
             reminder_text = text.split('минут', 1)[1].strip()
@@ -244,6 +239,7 @@ def set_reminder(message):
             response = f"✅ Напоминание установлено!\n⏰ Через {minutes} минут: {reminder_text}"
             
         elif 'через' in text and 'час' in text:
+            # Извлекаем количество часов
             parts = text.split('через')[1].split('час')[0].strip()
             hours = int(''.join(filter(str.isdigit, parts)))
             reminder_text = text.split('час', 1)[1].strip()
@@ -297,34 +293,11 @@ def show_creator(message):
 Telegram ID: {CREATOR_USER_ID}
 
 Я - Фибис, личный ИИ-помощник, созданный исключительно для {CREATOR_USERNAME}.
-Я запущен на Render.com и работаю 24/7!
+Я принадлежу только ей и всегда помню об этом!
 
 Всегда к вашим услугам, моя Госпожа! 🤖
     """
     bot.send_message(message.chat.id, creator_info)
-
-@bot.message_handler(commands=['status'])
-def show_status(message):
-    user_id = message.from_user.id
-    if not is_authorized(user_id):
-        send_unauthorized_message(message.chat.id, user_id)
-        return
-
-    status_info = f"""
-🤖 СТАТУС БОТА:
-
-Версия: {improved_fibis.version}
-Платформа: Render.com
-Статус: ✅ Работает 24/7
-Время запуска: {datetime.datetime.now()}
-
-База данных: ✅ Активна
-Напоминания: ✅ Активны
-ИИ-модуль: ✅ Активен
-
-Все системы работают нормально! 🚀
-    """
-    bot.send_message(message.chat.id, status_info)
 
 @bot.message_handler(commands=['context'])
 def show_context(message):
@@ -353,9 +326,10 @@ def handle_message(message):
     print(f"📨 От создателя: {message.text}")
     bot.send_chat_action(message.chat.id, 'typing')
     
+    # Сохраняем сообщение пользователя
     improved_fibis.save_conversation(user_id, "user", message.text)
     
-    # Проверка специальных вопросов о создателе
+    # Проверяем специальные вопросы о создателе
     if any(phrase in message.text.lower() for phrase in [
         'кто твой создатель', 'кто тебя создал', 'твой создатель', 
         'кто тебя сделал', 'кому ты принадлежишь'
@@ -385,74 +359,12 @@ def handle_message(message):
                 improved_fibis.save_conversation(user_id, "assistant", response)
                 return
         except:
-            pass
+            pass  # Если не получилось распарсить напоминание, продолжаем к ИИ
 
     # Имитация размышления
     time.sleep(1)
     
     # Получаем ответ от ИИ с контекстом
-    response = improved_fibis.ask_tongyi_ai(user_id, message.text)
-    nickname = improved_fibis.get_creator_nickname()
-    
-    final_response = f"{nickname}, {response}"
-    
-    # 🔥 РАЗБИВКА ДЛИННЫХ СООБЩЕНИЙ НА ЧАСТИ
-    def split_message(text, max_length=4000):
-        """Разбивает длинное сообщение на части"""
-        if len(text) <= max_length:
-            return [text]
-        
-        parts = []
-        while len(text) > max_length:
-            # Пытаемся разбить по последнему пробелу в пределах max_length
-            split_at = text.rfind(' ', 0, max_length)
-            if split_at == -1:
-                # Если нет пробелов, просто режем по max_length
-                split_at = max_length
-            parts.append(text[:split_at])
-            text = text[split_at:].strip()
-        
-        if text:
-            parts.append(text)
-        
-        return parts
-    
-    # Отправляем сообщение частями
-    message_parts = split_message(final_response)
-    for i, part in enumerate(message_parts):
-        if i == 0:
-            # Первая часть отправляется как есть
-            bot.send_message(message.chat.id, part)
-        else:
-            # Последующие части с пометкой о продолжении
-            bot.send_message(message.chat.id, f"... (продолжение)\n\n{part}")
-        
-        # Небольшая задержка между отправками
-        time.sleep(0.5)
-    
-    # Сохраняем полный ответ в базу
-    improved_fibis.save_conversation(user_id, "assistant", final_response)
-    
-    if 'напомни' in message.text.lower():
-        try:
-            text = message.text.lower()
-            if 'через' in text and 'минут' in text:
-                parts = text.split('через')[1].split('минут')[0].strip()
-                minutes = int(''.join(filter(str.isdigit, parts)))
-                reminder_text = text.split('минут', 1)[1].strip()
-                
-                reminder_time = datetime.datetime.now() + datetime.timedelta(minutes=minutes)
-                improved_fibis.save_reminder(user_id, reminder_text, reminder_time.isoformat())
-                
-                response = f"✅ Напоминание установлено!\n⏰ Через {minutes} минут: {reminder_text}"
-                bot.send_message(message.chat.id, response)
-                improved_fibis.save_conversation(user_id, "assistant", response)
-                return
-        except:
-            pass
-
-    time.sleep(1)
-    
     response = improved_fibis.ask_tongyi_ai(user_id, message.text)
     nickname = improved_fibis.get_creator_nickname()
     
@@ -470,19 +382,14 @@ def run_bot():
             print("🔄 Перезапуск через 10 секунд...")
             time.sleep(10)
 
-# Запускаем бот в отдельном потоке
 bot_thread = threading.Thread(target=run_bot)
 bot_thread.daemon = True
 bot_thread.start()
 
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    print("=" * 50)
-    print("🚀 ФИБИС ЗАПУЩЕН НА RENDER.COM")
-    print(f"👑 Создательница: {CREATOR_USERNAME}")
-    print("⏰ Система напоминаний: активна")
-    print("🧠 Контекстная память: активна")
-    print("🌐 Веб-сервер запущен на порту:", port)
-    print("=" * 50)
-    
-    app.run(host='0.0.0.0', port=port)
+print("=" * 50)
+print("🚀 УЛУЧШЕННЫЙ ФИБИС ЗАПУЩЕН")
+print(f"👑 Создательница: {CREATOR_USERNAME}")
+print("⏰ Система напоминаний: активна")
+print("🧠 Контекстная память: активна")
+print("⏰ Время:", datetime.datetime.now())
+print("=" * 50)
