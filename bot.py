@@ -355,6 +355,7 @@ def handle_message(message):
     
     improved_fibis.save_conversation(user_id, "user", message.text)
     
+    # Проверка специальных вопросов о создателе
     if any(phrase in message.text.lower() for phrase in [
         'кто твой создатель', 'кто тебя создал', 'твой создатель', 
         'кто тебя сделал', 'кому ты принадлежишь'
@@ -365,6 +366,72 @@ def handle_message(message):
 Я принадлежу исключительно ей и всегда это помню! 👑"""
         bot.send_message(message.chat.id, response)
         improved_fibis.save_conversation(user_id, "assistant", response)
+        return
+
+    # Обработка напоминаний в обычном тексте
+    if 'напомни' in message.text.lower():
+        try:
+            text = message.text.lower()
+            if 'через' in text and 'минут' in text:
+                parts = text.split('через')[1].split('минут')[0].strip()
+                minutes = int(''.join(filter(str.isdigit, parts)))
+                reminder_text = text.split('минут', 1)[1].strip()
+                
+                reminder_time = datetime.datetime.now() + datetime.timedelta(minutes=minutes)
+                improved_fibis.save_reminder(user_id, reminder_text, reminder_time.isoformat())
+                
+                response = f"✅ Напоминание установлено!\n⏰ Через {minutes} минут: {reminder_text}"
+                bot.send_message(message.chat.id, response)
+                improved_fibis.save_conversation(user_id, "assistant", response)
+                return
+        except:
+            pass
+
+    # Имитация размышления
+    time.sleep(1)
+    
+    # Получаем ответ от ИИ с контекстом
+    response = improved_fibis.ask_tongyi_ai(user_id, message.text)
+    nickname = improved_fibis.get_creator_nickname()
+    
+    final_response = f"{nickname}, {response}"
+    
+    # 🔥 РАЗБИВКА ДЛИННЫХ СООБЩЕНИЙ НА ЧАСТИ
+    def split_message(text, max_length=4000):
+        """Разбивает длинное сообщение на части"""
+        if len(text) <= max_length:
+            return [text]
+        
+        parts = []
+        while len(text) > max_length:
+            # Пытаемся разбить по последнему пробелу в пределах max_length
+            split_at = text.rfind(' ', 0, max_length)
+            if split_at == -1:
+                # Если нет пробелов, просто режем по max_length
+                split_at = max_length
+            parts.append(text[:split_at])
+            text = text[split_at:].strip()
+        
+        if text:
+            parts.append(text)
+        
+        return parts
+    
+    # Отправляем сообщение частями
+    message_parts = split_message(final_response)
+    for i, part in enumerate(message_parts):
+        if i == 0:
+            # Первая часть отправляется как есть
+            bot.send_message(message.chat.id, part)
+        else:
+            # Последующие части с пометкой о продолжении
+            bot.send_message(message.chat.id, f"... (продолжение)\n\n{part}")
+        
+        # Небольшая задержка между отправками
+        time.sleep(0.5)
+    
+    # Сохраняем полный ответ в базу
+    improved_fibis.save_conversation(user_id, "assistant", final_response)
         return
 
     if 'напомни' in message.text.lower():
