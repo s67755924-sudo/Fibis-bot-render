@@ -432,7 +432,7 @@ def handle_message(message):
     
     # Сохраняем полный ответ в базу
     improved_fibis.save_conversation(user_id, "assistant", final_response)
-        return
+    
     if 'напомни' in message.text.lower():
         try:
             text = message.text.lower()
